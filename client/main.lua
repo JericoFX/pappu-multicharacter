@@ -237,18 +237,13 @@ RegisterNUICallback('cDataPed', function(nData, cb)
     DeleteEntity(charPed)
     if cData ~= nil then
         if not cached_player_skins[cData.citizenid] then
-            local temp_model = promise.new()
-            local temp_data = promise.new()
             local skinData = lib.callback.await("pappu-multicharacter:server:getSkin",200,cData.citizenid)
             local resolved_model = skinData.model
             local resolved_data = skinData
-
             cached_player_skins[cData.citizenid] = {model = resolved_model, data = resolved_data}
         end
-
         local model = cached_player_skins[cData.citizenid].model
         local data = cached_player_skins[cData.citizenid].data
-
         if model ~= nil then
             initializePedModel(model, json.decode(data))
         else
