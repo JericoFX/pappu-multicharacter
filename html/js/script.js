@@ -1,42 +1,33 @@
-const WelcomePercentage = '30vh';
+const WELCOME_PERCENTAGE = '30vh';
 let selectedChar = null;
 let qbMultiCharacters = {};
 let translations = {};
-let Loaded = false;
-let NChar = null;
-let EnableDeleteButton = false;
+let loaded = false;
+let nChar = null;
+let enableDeleteButton = false;
 const dollar = Intl.NumberFormat('en-US');
 
 $(document).ready(() => {
   window.addEventListener('message', handleMessage);
   $('.datepicker').datepicker();
+  initCharacterEvents();
 });
 
 function handleMessage(event) {
-  const data = event.data;
-  if (data.action === 'ui') {
+  const { action, data } = event.data;
+  if (action === 'ui') {
     handleUIAction(data);
-  } else if (data.action === 'setupCharacters') {
-    setupCharacters(
-      data.characters,
-      data.photo1,
-      data.photo2,
-      data.photo3,
-      data.photo4
-    );
+  } else if (action === 'setupCharacters') {
+    setupCharacters(data.characters, data.photos);
   }
 }
 
-function handleUIAction(data) {
-  NChar = data.nChar;
-  EnableDeleteButton = data.enableDeleteButton;
-  translations = data.translations;
+function handleUIAction({ toggle, nChar, enableDeleteButton, translations }) {
+  nChar = nChar;
+  enableDeleteButton = enableDeleteButton;
+  translations = translations;
 
-  if (data.toggle) {
-    showWelcomeScreen();
-  } else {
-    hideWelcomeScreen();
-  }
+  toggle ? showWelcomeScreen() : hideWelcomeScreen();
 }
 
 function showWelcomeScreen() {
@@ -51,7 +42,7 @@ function showWelcomeScreen() {
       $('.welcomescreen').fadeOut(150);
       showCharacterList();
       $.post('https://pappu-multicharacter/removeBlur');
-      SetLocal();
+      setLocalText();
     }, 500);
   }, 2000);
 }
@@ -82,29 +73,21 @@ function showCharacterList() {
   $('.btns').css({ display: 'flex' });
 }
 
-async function getBase64Image(
-  src,
-  removeImageBackGround,
-  callback,
-  outputFormat
-) {
+async function getBase64Image(src, callback, outputFormat = 'image/png') {
   const img = new Image();
   img.crossOrigin = 'Anonymous';
   img.src = src;
 
   img.onload = async () => {
     const canvas = document.createElement('canvas');
+    canvas.height = canvas.width = 320;
     const ctx = canvas.getContext('2d');
-    const selectedSize = 320;
-    canvas.height = selectedSize;
-    canvas.width = selectedSize;
-    ctx.drawImage(img, 0, 0, selectedSize, selectedSize);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     await removeBackGround(canvas);
-    const dataURL = canvas.toDataURL(outputFormat);
-    callback(dataURL);
+    callback(canvas.toDataURL(outputFormat));
   };
 
-  img.onerror = () => callback(translations['default_image']);
+  img.onerror = () => callback(translations.default_image);
 }
 
 async function removeBackGround(canvas) {
@@ -115,128 +98,113 @@ async function removeBackGround(canvas) {
     multiplier: 0.75,
     quantBytes: 2,
   });
+  const map = await net.segmentPerson(canvas, { internalResolution: 'medium' });
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  const newImgData = ctx.createImageData(canvas.width, canvas.height).data;
 
-  const { data: map } = await net.segmentPerson(canvas, {
-    internalResolution: 'medium',
-  });
-
-  const { data: imgData } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const newImg = ctx.createImageData(canvas.width, canvas.height);
-  const newImgData = newImg.data;
-
-  for (let i = 0; i < map.length; i++) {
+  map.forEach((val, i) => {
     const [r, g, b, a] = [
       imgData[i * 4],
       imgData[i * 4 + 1],
       imgData[i * 4 + 2],
       imgData[i * 4 + 3],
     ];
-    [
-      newImgData[i * 4],
-      newImgData[i * 4 + 1],
-      newImgData[i * 4 + 2],
-      newImgData[i * 4 + 3],
-    ] = !map[i] ? [255, 255, 255, 0] : [r, g, b, a];
-  }
+    if (!val)
+      [
+        newImgData[i * 4],
+        newImgData[i * 4 + 1],
+        newImgData[i * 4 + 2],
+        newImgData[i * 4 + 3],
+      ] = [255, 255, 255, 0];
+    else
+      [
+        newImgData[i * 4],
+        newImgData[i * 4 + 1],
+        newImgData[i * 4 + 2],
+        newImgData[i * 4 + 3],
+      ] = [r, g, b, a];
+  });
 
-  ctx.putImageData(newImg, 0, 0);
+  ctx.putImageData(
+    new ImageData(newImgData, canvas.width, canvas.height),
+    0,
+    0
+  );
 }
 
-function SetLocal() {
-  $('.characters-text').html(translations['characters_header']);
+function setLocalText() {
+  $('.characters-text').html(translations.characters_header);
 }
 
-function setupCharacters(characters, photo1, photo2, photo3, photo4) {
+function setupCharacters(characters, photos) {
   $('.characters-text2').html(
-    `${characters.length}/ ${NChar} ${translations['characters_count']}`
+    `${characters.length}/ ${nChar} ${translations.characters_count}`
   );
   setCharactersList(characters.length);
 
-  characters.forEach((char) => {
+  characters.forEach((char, idx) => {
     const charElement = $(`#char-${char.cid}`);
-    charElement.html('');
-    charElement.data('citizenid', char.citizenid);
-
-    let tempUrl = getPhotoUrl(char.cid, photo1, photo2, photo3, photo4);
+    charElement.html('').data('citizenid', char.citizenid);
+    const photoUrl = photos[idx] || translations.default_image;
 
     setTimeout(() => {
-      if (tempUrl === translations['default_image']) {
-        setDefaultCharacter(charElement, char, tempUrl);
+      if (photoUrl === translations.default_image) {
+        setCharacterElement(charElement, char, photoUrl);
       } else {
-        getBase64Image(tempUrl, true, (dataUrl) => {
-          setCharacter(charElement, char, dataUrl);
+        getBase64Image(photoUrl, (dataUrl) => {
+          setCharacterElement(charElement, char, dataUrl);
         });
       }
     }, 100);
   });
 }
 
-function getPhotoUrl(cid, photo1, photo2, photo3, photo4) {
-  const photos = [photo1, photo2, photo3, photo4];
-  const photo = photos[cid - 1];
-  if (photo && photo !== 'none') {
-    return `https://nui-img/${photo}/${photo}?t=${Math.round(
-      new Date().getTime() / 1000
-    )}`;
-  }
-  return translations['default_image'];
+function setCharacterElement(element, char, imageUrl) {
+  element.html(getCharacterHTML(char, imageUrl));
+  element.data({ cData: char, cid: char.cid });
 }
 
-function setDefaultCharacter(element, char, tempUrl) {
-  element.html(getCharacterHTML(char, tempUrl));
-  element.data('cData', char);
-  element.data('cid', char.cid);
-}
-
-function setCharacter(element, char, tempUrl) {
-  element.html(getCharacterHTML(char, tempUrl));
-  element.data('cData', char);
-  element.data('cid', char.cid);
-}
-
-function getCharacterHTML(char, tempUrl) {
+function getCharacterHTML(char, imageUrl) {
   return `
-        <div class="character-div">
-            <div class="user"> 
-                <img src="${tempUrl}" alt="${char.cid} photo" />
-            </div>
-            <span id="slot-name">${char.charinfo.firstname} ${char.charinfo.lastname}
-                <span id="cid">${char.citizenid}</span>
-            </span>
-            <div class="user3">
-                <img src="${translations['default_right_image']}" alt="plus" />
-            </div>
-        </div>
-        <div class="btns">
-            <div class="character-btn" id="select" style="display: block;">
-                <p id="select-text"><i>${translations['select']}</i></p>
-            </div>
-        </div>
-    `;
+    <div class="character-div">
+      <div class="user">
+        <img src="${imageUrl}" alt="${char.cid} photo" />
+      </div>
+      <span id="slot-name">${char.charinfo.firstname} ${char.charinfo.lastname}
+        <span id="cid">${char.citizenid}</span>
+      </span>
+      <div class="user3">
+        <img src="${translations.default_right_image}" alt="plus" />
+      </div>
+    </div>
+    <div class="btns">
+      <div class="character-btn" id="select" style="display: block;">
+        <p id="select-text"><i>${translations.select}</i></p>
+      </div>
+    </div>`;
 }
 
-$(document).on('click', '#close-log', function (e) {
-  e.preventDefault();
-  selectedLog = null;
-  $('.welcomescreen').css('filter', 'none');
-  $('. container').fadeOut(250);
-});
+function initCharacterEvents() {
+  $(document).on('click', '#close-log', (e) => {
+    e.preventDefault();
+    $('.welcomescreen').css('filter', 'none');
+    $('.container').fadeOut(250);
+  });
 
-$(document).on('click', '.character-btn', function (e) {
-  e.preventDefault();
-  const charElement = $(this)
-    .closest('.characters-list')
-    .find('.character-div');
-  const charData = charElement.data('cData');
-  const cid = charElement.data('cid');
-  selectedChar = charData;
-  qbMultiCharacters.resetAll();
-  $.post(
-    'https://pappu-multicharacter/selectCharacter',
-    JSON.stringify({ cid })
-  );
-  setTimeout(() => {
-    $.post('https://pappu-multicharacter/removeBlur');
-    SetLocal();
-  }, 500);
-});
+  $(document).on('click', '.character-btn', function (e) {
+    e.preventDefault();
+    const charElement = $(this)
+      .closest('.characters-list')
+      .find('.character-div');
+    selectedChar = charElement.data('cData');
+    qbMultiCharacters.resetAll();
+    $.post(
+      'https://pappu-multicharacter/selectCharacter',
+      JSON.stringify({ cid: charElement.data('cid') })
+    );
+    setTimeout(() => {
+      $.post('https://pappu-multicharacter/removeBlur');
+      setLocalText();
+    }, 500);
+  });
+}
