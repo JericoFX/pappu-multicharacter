@@ -60,7 +60,7 @@ local function initializePedModel(model, data)
         PlaceObjectOnGroundProperly(charPed)
         SetBlockingOfNonTemporaryEvents(charPed, true)
         if data then
-            TriggerEvent('qb-clothing:client:loadPlayerClothing', data, charPed)
+              exports['illenium-appearance']:setPedAppearance(charPed, data)
         end
     end)
 end
@@ -71,7 +71,7 @@ local function skyCam(bool)
         DoScreenFadeIn(1000)
         SetTimecycleModifier('hud_def_blur')
         SetTimecycleModifierStrength(1.0)
-        FreezeEntityPosition(PlayerPedId(), false)
+        FreezeEntityPosition(cache.ped, false)
         cam = CreateCamWithParams("DEFAULT_SCRIPTED_CAMERA", Config.CamCoords.x, Config.CamCoords.y, Config.CamCoords.z, 0.0 ,0.0, Config.CamCoords.w, 60.00, false, 0)
         SetCamActive(cam, true)
         RenderScriptCams(true, false, 1, true, true)
@@ -80,7 +80,7 @@ local function skyCam(bool)
         SetCamActive(cam, false)
         DestroyCam(cam, true)
         RenderScriptCams(false, false, 1, true, true)
-        FreezeEntityPosition(PlayerPedId(), false)
+        FreezeEntityPosition(cache.ped, false)
     end
 end
 
@@ -116,14 +116,14 @@ RegisterNetEvent('pappu-multicharacter:client:closeNUIdefault', function() -- Th
     SetNuiFocus(false, false)
     DoScreenFadeOut(500)
     Wait(2000)
-    SetEntityCoords(PlayerPedId(), Config.DefaultSpawn.x, Config.DefaultSpawn.y, Config.DefaultSpawn.z)
+    SetEntityCoords(cache.ped, Config.DefaultSpawn.x, Config.DefaultSpawn.y, Config.DefaultSpawn.z)
     TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
     TriggerEvent('QBCore:Client:OnPlayerLoaded')
     TriggerServerEvent('qb-houses:server:SetInsideMeta', 0, false)
     TriggerServerEvent('qb-apartments:server:SetInsideMeta', 0, 0, false)
     Wait(500)
     openCharMenu()
-    SetEntityVisible(PlayerPedId(), true)
+    SetEntityVisible(cache.ped, true)
     Wait(500)
     DoScreenFadeIn(250)
     TriggerEvent('qb-weathersync:client:EnableSync')
@@ -144,28 +144,19 @@ RegisterNetEvent('pappu-multicharacter:client:chooseChar', function()
     while not IsInteriorReady(interior) do
         Wait(1000)
     end
-    FreezeEntityPosition(PlayerPedId(), true)
-    SetEntityCoords(PlayerPedId(), Config.HiddenCoords.x, Config.HiddenCoords.y, Config.HiddenCoords.z)
+    FreezeEntityPosition(cache.ped, true)
+    SetEntityCoords(cache.ped, Config.HiddenCoords.x, Config.HiddenCoords.y, Config.HiddenCoords.z)
     Wait(1500)
     ShutdownLoadingScreen()
     ShutdownLoadingScreenNui()
     openCharMenu(true)
 end)
 
-AddEventHandler('onResourceStart', function(resourceName)
-    if (GetCurrentResourceName() ~= resourceName) then
-        return
-    end
-
-    print('working #pappu-multicharacter')
-end)
-
-
 RegisterNetEvent('pappu-multicharacter:client:spawnLastLocation', function(coords, cData)
     QBCore.Functions.TriggerCallback('apartments:GetOwnedApartment', function(result)
         if result then
             TriggerEvent("apartments:client:SetHomeBlip", result.type)
-            local ped = PlayerPedId()
+            local ped = cache.ped
             SetEntityCoords(ped, coords.x, coords.y, coords.z)
             SetEntityHeading(ped, coords.w)
             FreezeEntityPosition(ped, false)
@@ -261,14 +252,9 @@ RegisterNUICallback('cDataPed', function(nData, cb)
         if not cached_player_skins[cData.citizenid] then
             local temp_model = promise.new()
             local temp_data = promise.new()
-
-            QBCore.Functions.TriggerCallback('pappu-multicharacter:server:getSkin', function(model, data)
-                temp_model:resolve(model)
-                temp_data:resolve(data)
-            end, cData.citizenid)
-
-            local resolved_model = Citizen.Await(temp_model)
-            local resolved_data = Citizen.Await(temp_data)
+            local skinData = lib.callback.await("pappu-multicharacter:server:getSkin",200,cData.citizenid)
+            local resolved_model =  joaat(skinData.model)
+            local resolved_data = skinData
 
             cached_player_skins[cData.citizenid] = {model = resolved_model, data = resolved_data}
         end
@@ -291,14 +277,13 @@ RegisterNUICallback('cDataPed', function(nData, cb)
 end)
 
 RegisterNUICallback('setupCharacters', function(_, cb)
-    QBCore.Functions.TriggerCallback("pappu-multicharacter:server:setupCharacters", function(result)
-        cached_player_skins = {}
-        SendNUIMessage({
-            action = "setupCharacters",
-            characters = result
-        })
-        cb("ok")
-    end)
+   local result =  lib.callback.await("pappu-multicharacter:server:setupCharacters",200)
+    cached_player_skins = {}
+    SendNUIMessage({
+        action = "setupCharacters",
+        characters = result
+    })
+    cb("ok")
 end)
 
 RegisterNUICallback('removeBlur', function(_, cb)
@@ -320,6 +305,8 @@ RegisterNUICallback('createNewCharacter', function(data, cb)
 end)
 
 RegisterNUICallback('removeCharacter', function(data, cb)
+      cb("ok")
+    if not Config.EnableDeleteButton then return end
     TriggerServerEvent('pappu-multicharacter:server:deleteCharacter', data.citizenid)
     TriggerEvent('pappu-multicharacter:client:chooseChar')
     cb("ok")

@@ -21,7 +21,8 @@ local function GiveStarterItems(source)
             info.birthdate = Player.PlayerData.charinfo.birthdate
             info.type = "Class C Driver License"
         end
-        exports['pappu-inventorynp']:AddItem(src, v.item, v.amount, false, info, 'pappu-multicharacter:GiveStarterItems')
+        --https://overextended.dev/ox_inventory/Functions/Server#additem
+        exports.ox_inventory:AddItem(src, v.item, v.amount, false, nil, nil)
     end
 end
 
@@ -58,7 +59,7 @@ end
 
 -- Discord logging function
 local function sendToDiscord(name, message, color)
-    local discordWebhook = "https://canary.discord.com/api/webhooks/1255278139291209831/rmq4wlFMeMTEHiU1fnQ08jWhHdrJ5e4wJ7ETkBOuzm1I82w2Qi_-u57NUIO1rjUNUY_D" -- Replace with your Discord webhook URL
+    local discordWebhook = "" -- Replace with your Discord webhook URL
     
     local embeds = {
         {
@@ -152,23 +153,7 @@ RegisterNetEvent('pappu-multicharacter:server:loadUserData', function(cData)
     end
 end)
 
--- Ensure the resource name is correct
-Citizen.CreateThread(function()
-    if (GetCurrentResourceName() ~= "pappu-multicharacter") then 
-        print("[" .. GetCurrentResourceName() .. "] " .. "IMPORTANT: This resource must be named pappu-multicharacter for it to work properly!")
-        print("[" .. GetCurrentResourceName() .. "] " .. "IMPORTANT: This resource must be named pappu-multicharacter for it to work properly!");
-        print("[" .. GetCurrentResourceName() .. "] " .. "IMPORTANT: This resource must be named pappu-multicharacter for it to work properly!");
-        print("[" .. GetCurrentResourceName() .. "] " .. "IMPORTANT: This resource must be named pappu-multicharacter for it to work properly!");
-    end
-end)
 
--- Print resource start message
-Citizen.CreateThread(function()
-    local resourceName = "^2 P4ScriptsFivem Started ("..GetCurrentResourceName()..")"
-    print("\n^1----------------------------------------------------------------------------------^7")
-    print(resourceName)
-    print("^1----------------------------------------------------------------------------------^7")
-end)
 
 
 RegisterNetEvent('pappu-multicharacter:server:createCharacter', function(data)
@@ -201,8 +186,16 @@ RegisterNetEvent('pappu-multicharacter:server:createCharacter', function(data)
     end
 end)
 
+
 RegisterNetEvent('pappu-multicharacter:server:deleteCharacter', function(citizenid)
     local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+    local variable = MySQL.single.await("SELECT license , citizenid FROM players WHERE citizenid = ?", {citizenid})
+    if not (variable.citizenid == Player.PlayerData.citizenid) and not (Player.PlayerData.license == variable.license) then
+        DropPlayer(src,"Exploiting Delete character")
+        return
+    end
+    if not Config.EnableDeleteButton then DropPlayer(src,"Exploiting Delete character") return end
     QBCore.Player.DeleteCharacter(src, citizenid)
     local fivemname = GetPlayerName(src)
     sendToDiscord("Character Deleted", string.format("Citizen ID: %s\nFiveM Name: %s", citizenid, fivemname), 15158332)
@@ -210,6 +203,30 @@ RegisterNetEvent('pappu-multicharacter:server:deleteCharacter', function(citizen
 end)
 
 -- Callbacks
+lib.callback.register("pappu-multicharacter:server:GetUserCharacters",function(source) 
+    local src = source
+    local license, license2 = GetPlayerIdentifierByType(src, 'license'), GetPlayerIdentifierByType(src, 'license2')
+    local characters = {}
+    if not license then
+      return characters
+    end
+    local result =  MySQL.query.await('SELECT * FROM players WHERE license = ? OR license = ?', {license2, license})
+    if result[1] then
+            for _, v in pairs(result) do
+                local charinfo = json.decode(v.charinfo)
+                local data = {
+                    citizenid = v.citizenid,
+                    charinfo = charinfo,
+                    cData = v
+                }
+                characters[#characters+1] = data
+            end
+           return characters
+    else
+           return characters
+    end
+    return characters
+end)
 
 QBCore.Functions.CreateCallback("pappu-multicharacter:server:GetUserCharacters", function(source, cb)
     local src = source
@@ -237,51 +254,88 @@ QBCore.Functions.CreateCallback("pappu-multicharacter:server:GetUserCharacters",
     end)
 end)
 
-QBCore.Functions.CreateCallback("pappu-multicharacter:server:GetServerLogs", function(_, cb)
-    MySQL.query('SELECT * FROM server_logs', {}, function(result)
-        cb(result)
+lib.callback.register("pappu-multicharacter:server:GetServerLogs",function(source) 
+ MySQL.query('SELECT * FROM server_logs', {}, function(result)
+        return result or nil
     end)
+    return false
 end)
 
-QBCore.Functions.CreateCallback("pappu-multicharacter:server:GetNumberOfCharacters", function(source, cb)
+-- QBCore.Functions.CreateCallback("pappu-multicharacter:server:GetServerLogs", function(_, cb)
+--     MySQL.query('SELECT * FROM server_logs', {}, function(result)
+--         cb(result)
+--     end)
+-- end)
+
+lib.callback.register("pappu-multicharacter:server:GetNumberOfCharacters",function(source) 
     local src = source
     local license, license2 = GetPlayerIdentifierByType(src, 'license'), GetPlayerIdentifierByType(src, 'license2')
-    local numOfChars = 0
-
-    if next(Config.PlayersNumberOfCharacters) then
-        for _, v in pairs(Config.PlayersNumberOfCharacters) do
-            if v.license == license or v.license == license2 then
-                numOfChars = v.numberOfChars
-                break
-            else
-                numOfChars = Config.DefaultNumberOfCharacters
-            end
-        end
+    if Config.PlayersNumberOfCharacters[tostring(license)] or Config.PlayersNumberOfCharacters[tostring(license2)] then
+        return Config.PlayersNumberOfCharacters[tostring(license)]
     else
-        numOfChars = Config.DefaultNumberOfCharacters
+       return Config.DefaultNumberOfCharacters
     end
-    cb(numOfChars)
 end)
 
-QBCore.Functions.CreateCallback("pappu-multicharacter:server:setupCharacters", function(source, cb)
-    local license, license2 = GetPlayerIdentifierByType(src, 'license'), GetPlayerIdentifierByType(src, 'license2')
-    local plyChars = {}
-    MySQL.query('SELECT * FROM players WHERE license = ? or license = ?', {license, license2}, function(result)
+-- QBCore.Functions.CreateCallback("pappu-multicharacter:server:GetNumberOfCharacters", function(source, cb)
+--     local src = source
+--     local license, license2 = GetPlayerIdentifierByType(src, 'license'), GetPlayerIdentifierByType(src, 'license2')
+--     local numOfChars = 0
+
+--     if next(Config.PlayersNumberOfCharacters) then
+--         for _, v in pairs(Config.PlayersNumberOfCharacters) do
+--             if v.license == license or v.license == license2 then
+--                 numOfChars = v.numberOfChars
+--                 break
+--             else
+--                 numOfChars = Config.DefaultNumberOfCharacters
+--             end
+--         end
+--     else
+--         numOfChars = Config.DefaultNumberOfCharacters
+--     end
+--     cb(numOfChars)
+-- end)
+
+lib.callback.register("pappu-multicharacter:server:setupCharacters",function(source) 
+ local license, license2 = GetPlayerIdentifierByType(src, 'license'), GetPlayerIdentifierByType(src, 'license2')
+ local plyChars = {}
+  MySQL.query('SELECT * FROM players WHERE license = ? or license = ?', {license, license2}, function(result)
         for i = 1, (#result), 1 do
             result[i].charinfo = json.decode(result[i].charinfo)
             result[i].money = json.decode(result[i].money)
             result[i].job = json.decode(result[i].job)
             plyChars[#plyChars+1] = result[i]
         end
-        cb(plyChars)
+        return plyChars
     end)
+    return false
 end)
 
-QBCore.Functions.CreateCallback("pappu-multicharacter:server:getSkin", function(_, cb, cid)
-    local result = MySQL.query.await('SELECT * FROM playerskins WHERE citizenid = ? AND active = ?', {cid, 1})
-    if result[1] ~= nil then
-        cb(result[1].model, result[1].skin)
-    else
-        cb(nil)
-    end
+-- QBCore.Functions.CreateCallback("pappu-multicharacter:server:setupCharacters", function(source, cb)
+--     local license, license2 = GetPlayerIdentifierByType(src, 'license'), GetPlayerIdentifierByType(src, 'license2')
+--     local plyChars = {}
+--     MySQL.query('SELECT * FROM players WHERE license = ? or license = ?', {license, license2}, function(result)
+--         for i = 1, (#result), 1 do
+--             result[i].charinfo = json.decode(result[i].charinfo)
+--             result[i].money = json.decode(result[i].money)
+--             result[i].job = json.decode(result[i].job)
+--             plyChars[#plyChars+1] = result[i]
+--         end
+--         cb(plyChars)
+--     end)
+-- end)
+
+lib.callback.register("pappu-multicharacter:server:getSkin",function(source,cid)
+  local result = MySQL.query.await('SELECT * FROM playerskins WHERE citizenid = ? AND active = ?', {cid, 1})
+  return result[1] and json.decode(result[1].skin) or nil
 end)
+
+-- QBCore.Functions.CreateCallback("pappu-multicharacter:server:getSkin", function(_, cb, cid)
+--     local result = MySQL.query.await('SELECT * FROM playerskins WHERE citizenid = ? AND active = ?', {cid, 1})
+--     if result[1] ~= nil then
+--         cb(json.decode(result[1].skin))
+--     else
+--         cb(nil)
+--     end
+-- end)

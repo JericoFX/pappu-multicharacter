@@ -6,6 +6,7 @@ description 'pappu-multicharacter Allows players to create characters'
 version '1.0.4'
 
 shared_scripts {
+    '@ox_lib/init.lua',
     '@qb-core/shared/locale.lua',
     'locales/en.lua',
     'locales/*.lua',
