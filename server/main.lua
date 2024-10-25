@@ -142,12 +142,13 @@ RegisterNetEvent('pappu-multicharacter:server:loadUserData', function(cData)
             local coords = json.decode(cData.position)
             TriggerClientEvent('pappu-multicharacter:client:spawnLastLocation', src, coords, cData)
         else
-            if GetResourceState('qb-apartments') == 'started' then
-                TriggerClientEvent('apartments:client:setupSpawnUI', src, cData)
-            else
-                TriggerClientEvent('qb-spawn:client:setupSpawns', src, cData, false, nil)
-                TriggerClientEvent('qb-spawn:client:openUI', src, true)
-            end
+            TriggerClientEvent('ps-housing:client:setupSpawnUI', src, cData)
+            -- if GetResourceState('qb-apartments') == 'started' then
+            --     TriggerClientEvent('apartments:client:setupSpawnUI', src, cData)
+            -- else
+            --     TriggerClientEvent('qb-spawn:client:setupSpawns', src, cData, false, nil)
+            --     TriggerClientEvent('qb-spawn:client:openUI', src, true)
+            -- end
         end
         TriggerEvent("qb-log:server:CreateLog", "joinleave", "Loaded", "green", "**".. GetPlayerName(src) .. "** (<@"..(QBCore.Functions.GetIdentifier(src, 'discord'):gsub("discord:", "") or "unknown").."> |  ||"  ..(QBCore.Functions.GetIdentifier(src, 'ip') or 'undefined') ..  "|| | " ..(QBCore.Functions.GetIdentifier(src, 'license') or 'undefined') .." | " ..cData.citizenid.." | "..src..") loaded..")
     end
@@ -167,22 +168,13 @@ RegisterNetEvent('pappu-multicharacter:server:createCharacter', function(data)
         until hasDonePreloading[src]
         local fivemname = GetPlayerName(src)
         sendToDiscord("Character Created", string.format("Citizen ID: %s\nFirst Name: %s\nLast Name: %s\nFiveM Name: %s", newData.cid, data.firstname, data.lastname, fivemname), 3066993)
-        if GetResourceState('qb-apartments') == 'started' and Apartments.Starting then
-            local randbucket = (GetPlayerPed(src) .. math.random(1,999))
-            SetPlayerRoutingBucket(src, randbucket)
-            print('^2[qb-core]^7 '..GetPlayerName(src)..' has successfully loaded!')
-            QBCore.Commands.Refresh(src)
-            loadHouseData(src)
-            TriggerClientEvent("pappu-multicharacter:client:closeNUI", src)
-            TriggerClientEvent('apartments:client:setupSpawnUI', src, newData)
-            GiveStarterItems(src)
-        else
             print('^2[qb-core]^7 '..GetPlayerName(src)..' has successfully loaded!')
             QBCore.Commands.Refresh(src)
             loadHouseData(src)
             TriggerClientEvent("pappu-multicharacter:client:closeNUIdefault", src)
+            TriggerClientEvent('ps-housing:client:setupSpawnUI', src, newData)
             GiveStarterItems(src)
-        end
+      
     end
 end)
 

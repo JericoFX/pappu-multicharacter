@@ -39,20 +39,12 @@ end)
 
 -- Functions
 
-local function loadModel(model)
-    RequestModel(model)
-    while not HasModelLoaded(model) do
-        Wait(0)
-    end
-end
-
-
 local function initializePedModel(model, data)
     CreateThread(function()
         if not model then
             model = joaat(randommodels[math.random(#randommodels)])
         end
-        loadModel(model)
+        lib.requestModel(model)
         charPed = CreatePed(2, model, Config.PedCoords.x, Config.PedCoords.y, Config.PedCoords.z - 0.98, Config.PedCoords.w, false, true)
         SetPedComponentVariation(charPed, 0, 0, 0, 2)
         FreezeEntityPosition(charPed, false)
@@ -85,7 +77,7 @@ local function skyCam(bool)
 end
 
 local function openCharMenu(bool)
-    QBCore.Functions.TriggerCallback("pappu-multicharacter:server:GetNumberOfCharacters", function(result)
+        local result = lib.callwack.await("pappu-multicharacter:server:GetNumberOfCharacters",100)
         local translations = {}
         for k in pairs(Lang.fallback and Lang.fallback.phrases or Lang.phrases) do
             if k:sub(0, ('ui.'):len()) then
@@ -106,7 +98,7 @@ local function openCharMenu(bool)
             ShutdownLoadingScreenNui()
             loadScreenCheckState = true
         end
-    end)
+
 end
 
 -- Events
@@ -153,35 +145,30 @@ RegisterNetEvent('pappu-multicharacter:client:chooseChar', function()
 end)
 
 RegisterNetEvent('pappu-multicharacter:client:spawnLastLocation', function(coords, cData)
-    QBCore.Functions.TriggerCallback('apartments:GetOwnedApartment', function(result)
-        if result then
-            TriggerEvent("apartments:client:SetHomeBlip", result.type)
-            local ped = cache.ped
-            SetEntityCoords(ped, coords.x, coords.y, coords.z)
-            SetEntityHeading(ped, coords.w)
-            FreezeEntityPosition(ped, false)
-            SetEntityVisible(ped, true)
-            local PlayerData = QBCore.Functions.GetPlayerData()
-            local insideMeta = PlayerData.metadata["inside"]
-            DoScreenFadeOut(500)
-
-            if insideMeta.house then
-                TriggerEvent('qb-houses:client:LastLocationHouse', insideMeta.house)
-            elseif insideMeta.apartment.apartmentType and insideMeta.apartment.apartmentId then
-                TriggerEvent('qb-apartments:client:LastLocationHouse', insideMeta.apartment.apartmentType, insideMeta.apartment.apartmentId)
-            else
-                SetEntityCoords(ped, coords.x, coords.y, coords.z)
-                SetEntityHeading(ped, coords.w)
-                FreezeEntityPosition(ped, false)
-                SetEntityVisible(ped, true)
-            end
-
-            TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
-            TriggerEvent('QBCore:Client:OnPlayerLoaded')
-            Wait(2000)
-            DoScreenFadeIn(250)
-        end
-    end, cData.citizenid)
+     local result = lib.callback.await('ps-housing:cb:GetOwnedApartment', source, cData.citizenid)
+    if result then
+        TriggerEvent("apartments:client:SetHomeBlip", result.type)
+    end
+    local ped = cache.ped
+    SetEntityCoords(ped, coords.x, coords.y, coords.z)
+    SetEntityHeading(ped, coords.w)
+    FreezeEntityPosition(ped, false)
+    SetEntityVisible(ped, true)
+    local PlayerData = QBCore.Functions.GetPlayerData()
+    local insideMeta = PlayerData.metadata["inside"]
+    DoScreenFadeOut(500)
+    if insideMeta.propertyId then
+        TriggerServerEvent('ps-housing:server:enterProperty', tostring(insideMeta.propertyId))
+    else
+        SetEntityCoords(ped, coords.x, coords.y, coords.z)
+        SetEntityHeading(ped, coords.w)
+        FreezeEntityPosition(ped, false)
+        SetEntityVisible(ped, true)
+    end
+    TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
+    TriggerEvent('QBCore:Client:OnPlayerLoaded')
+    Wait(2000)
+    DoScreenFadeIn(250)
 end)
 
 -- NUI Callbacks
