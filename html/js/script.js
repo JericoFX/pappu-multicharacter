@@ -62,7 +62,7 @@ function hideWelcomeScreen() {
 }
 
 function loadingAnimation() {
-  let loadingText = 'Loading';
+  let loadingText = 'Cargando';
   let loadingDots = 0;
   const loadingInterval = setInterval(() => {
     loadingDots = (loadingDots + 1) % 4;
