@@ -261,7 +261,9 @@ RegisterNUICallback('selectCharacter', function(data, cb)
     DeleteEntity(charPed)
     cb("ok")
 end)
-
+CreateThread(function() 
+    SetInstancePriorityHint(2) -- reduce the amount of objects in the world
+end)
 RegisterNUICallback('cDataPed', function(nData, cb)
     local cData = nData.cData
     SetEntityAsMissionEntity(charPed, true, true)
