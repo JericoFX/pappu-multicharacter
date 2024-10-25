@@ -1,5 +1,6 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local hasDonePreloading = {}
+local SConfig = require "server.config"
 
 -- Functions
 
@@ -59,7 +60,7 @@ end
 
 -- Discord logging function
 local function sendToDiscord(name, message, color)
-    local discordWebhook = "" -- Replace with your Discord webhook URL
+    local discordWebhook = SConfig.WebHook -- Replace with your Discord webhook URL
     
     local embeds = {
         {
@@ -138,7 +139,7 @@ RegisterNetEvent('pappu-multicharacter:server:loadUserData', function(cData)
         sendToDiscord("Player Loaded", string.format("Citizen ID: %s\nFiveM Name: %s", cData.citizenid, fivemname), 3066993)
         QBCore.Commands.Refresh(src)
         loadHouseData(src)
-        if Config.SkipSelection then
+        if SConfig.SkipSelection then
             local coords = json.decode(cData.position)
             TriggerClientEvent('pappu-multicharacter:client:spawnLastLocation', src, coords, cData)
         else
@@ -187,7 +188,7 @@ RegisterNetEvent('pappu-multicharacter:server:deleteCharacter', function(citizen
         DropPlayer(src,"Exploiting Delete character")
         return
     end
-    if not Config.EnableDeleteButton then DropPlayer(src,"Exploiting Delete character") return end
+    if not SConfig.EnableDeleteButton then DropPlayer(src,"Exploiting Delete character") return end
     QBCore.Player.DeleteCharacter(src, citizenid)
     local fivemname = GetPlayerName(src)
     sendToDiscord("Character Deleted", string.format("Citizen ID: %s\nFiveM Name: %s", citizenid, fivemname), 15158332)
@@ -262,10 +263,10 @@ end)
 lib.callback.register("pappu-multicharacter:server:GetNumberOfCharacters",function(source) 
     local src = source
     local license, license2 = GetPlayerIdentifierByType(src, 'license'), GetPlayerIdentifierByType(src, 'license2')
-    if Config.PlayersNumberOfCharacters[tostring(license)] or Config.PlayersNumberOfCharacters[tostring(license2)] then
-        return Config.PlayersNumberOfCharacters[tostring(license)]
+    if SConfig.PlayersNumberOfCharacters[tostring(license)] or SConfig.PlayersNumberOfCharacters[tostring(license2)] then
+        return SConfig.PlayersNumberOfCharacters[tostring(license)]
     else
-       return Config.DefaultNumberOfCharacters
+       return SConfig.DefaultNumberOfCharacters
     end
 end)
 

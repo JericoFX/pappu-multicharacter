@@ -285,7 +285,6 @@ RegisterNUICallback('createNewCharacter', function(data, cb)
 end)
 
 RegisterNUICallback('removeCharacter', function(data, cb)
-      cb("ok")
     if not Config.EnableDeleteButton then return end
     TriggerServerEvent('pappu-multicharacter:server:deleteCharacter', data.citizenid)
     TriggerEvent('pappu-multicharacter:client:chooseChar')
