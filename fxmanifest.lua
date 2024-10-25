@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 author 'pappu'
-description 'pappu-multicharacter Allows players to create characters'
+description 'pappu-multicharacter Allows players to create characters Updated by JericoFX'
 version '1.0.4'
 
 shared_scripts {

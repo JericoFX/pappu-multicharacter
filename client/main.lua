@@ -240,7 +240,7 @@ RegisterNUICallback('cDataPed', function(nData, cb)
             local temp_model = promise.new()
             local temp_data = promise.new()
             local skinData = lib.callback.await("pappu-multicharacter:server:getSkin",200,cData.citizenid)
-            local resolved_model =  joaat(skinData.model)
+            local resolved_model = skinData.model
             local resolved_data = skinData
 
             cached_player_skins[cData.citizenid] = {model = resolved_model, data = resolved_data}
@@ -248,8 +248,6 @@ RegisterNUICallback('cDataPed', function(nData, cb)
 
         local model = cached_player_skins[cData.citizenid].model
         local data = cached_player_skins[cData.citizenid].data
-
-        model = model ~= nil and tonumber(model) or false
 
         if model ~= nil then
             initializePedModel(model, json.decode(data))
